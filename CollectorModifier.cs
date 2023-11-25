@@ -51,14 +51,26 @@ namespace CollectorModifier {
                         Id: "spawnCutoff"
                     ),
                     new CustomSlider(
-                        name: "Max Number of Minions Per Wave",
+                        name: "Min Minions Per Wave",
+                        storeValue: val => {
+                            localSettings.minNumMinionsPerWave = (int)val;
+                            ApplyMaxNumMinionsPerWave();
+                        },
+                        loadValue: () => localSettings.minNumMinionsPerWave,
+                        minValue: 2,
+                        maxValue: 40,
+                        wholeNumbers: true,
+                        Id: "maxNumMinionsPerWave"
+                    ),
+                    new CustomSlider(
+                        name: "Max Minions Per Wave",
                         storeValue: val => {
                             localSettings.maxNumMinionsPerWave = (int)val;
                             ApplyMaxNumMinionsPerWave();
                         },
                         loadValue: () => localSettings.maxNumMinionsPerWave,
                         minValue: 3,
-                        maxValue: 20,
+                        maxValue: 40,
                         wholeNumbers: true,
                         Id: "maxNumMinionsPerWave"
                     ),
@@ -92,11 +104,14 @@ namespace CollectorModifier {
         private void SceneChanged(UnityEngine.SceneManagement.Scene _, UnityEngine.SceneManagement.Scene to) {
             if (to.name != "GG_Collector" && to.name != "GG_Collector_V") {
                 controlFSM = null;
+                phaseControlFSM = null;
+                damageControlFSM = null;
             }
         }
 
         public void ApplySettings() {
             ApplySpawnCutoff();
+            ApplyMinNumMinionsPerWave();
             ApplyMaxNumMinionsPerWave();
         }
 
@@ -107,15 +122,28 @@ namespace CollectorModifier {
             controlFSM.Fsm.Variables.GetFsmInt("Enemies Max").Value = localSettings.spawnCutoff;
         }
 
-        public void ApplyMaxNumMinionsPerWave() {
+        public void ApplyMinNumMinionsPerWave() {
             if (phaseControlFSM == null) return;
 
-            phaseControlFSM.GetAction<SetFsmInt>("Phase 2", 0).setValue = (int)Math.Ceiling((double)(localSettings.maxNumMinionsPerWave / 2));
+            phaseControlFSM.GetAction<SetFsmInt>("Phase 2", 0).setValue = localSettings.minNumMinionsPerWave;
+
+            if (damageControlFSM == null) return;
+            if (damageControlFSM.Fsm.Variables.GetFsmBool("Phase 2").Value) {
+                controlFSM.Fsm.Variables.GetFsmInt("Spawn Min").Value = localSettings.minNumMinionsPerWave;
+            }
+        }
+
+        public void ApplyMaxNumMinionsPerWave() {
+            if (localSettings.maxNumMinionsPerWave < localSettings.minNumMinionsPerWave) {
+                localSettings.maxNumMinionsPerWave = localSettings.minNumMinionsPerWave;
+            }
+
+            if (phaseControlFSM == null) return;
+
             phaseControlFSM.GetAction<SetFsmInt>("Phase 2", 1).setValue = localSettings.maxNumMinionsPerWave;
 
             if (damageControlFSM == null) return;
             if (damageControlFSM.Fsm.Variables.GetFsmBool("Phase 2").Value) {
-                controlFSM.Fsm.Variables.GetFsmInt("Spawn Min").Value = (int)Math.Ceiling((double)(localSettings.maxNumMinionsPerWave / 2));
                 controlFSM.Fsm.Variables.GetFsmInt("Spawn Max").Value = localSettings.maxNumMinionsPerWave;
             }
         }
@@ -127,14 +155,17 @@ namespace CollectorModifier {
             ApplySettings();
 
             CustomSlider spawnCutoffSlider = menuRef.Find("spawnCutoff") as CustomSlider;
+            CustomSlider minNumMinionsPerWaveSlider = menuRef.Find("minNumMinionsPerWave") as CustomSlider;
             CustomSlider maxNumMinionsPerWaveSlider = menuRef.Find("maxNumMinionsPerWave") as CustomSlider;
             spawnCutoffSlider.Update();
+            minNumMinionsPerWaveSlider.Update();
             maxNumMinionsPerWaveSlider.Update();
         }
     }
 
     public class LocalSettings {
         public int spawnCutoff = 4;
+        public int minNumMinionsPerWave = 2;
         public int maxNumMinionsPerWave = 3;
     }
 }
