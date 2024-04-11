@@ -1,11 +1,7 @@
-﻿using System.Collections.Generic;
-using System;
-using Modding;
+﻿using Modding;
 using Satchel.BetterMenus;
 using SFCore.Utils;
-using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
-using System.Linq;
 
 namespace CollectorModifier {
     public class CollectorModifier : Mod, ICustomMenuMod, ILocalSettings<LocalSettings> {
@@ -14,6 +10,7 @@ namespace CollectorModifier {
         private PlayMakerFSM controlFSM = null;
         private PlayMakerFSM phaseControlFSM = null;
         private PlayMakerFSM damageControlFSM = null;
+        private PlayMakerFSM stunControlFSM = null;
 
         public CollectorModifier() : base("Collector Modifier") => instance = this;
 
@@ -60,7 +57,7 @@ namespace CollectorModifier {
                         minValue: 2,
                         maxValue: 40,
                         wholeNumbers: true,
-                        Id: "maxNumMinionsPerWave"
+                        Id: "minNumMinionsPerWave"
                     ),
                     new CustomSlider(
                         name: "Max Minions Per Wave",
@@ -73,6 +70,17 @@ namespace CollectorModifier {
                         maxValue: 40,
                         wholeNumbers: true,
                         Id: "maxNumMinionsPerWave"
+                    ),
+                    new HorizontalOption(
+                        name: "Disable Stagger",
+                        description: "Prevents stagger",
+                        values: new [] {"true", "false"},
+                        applySetting: val => {
+                            localSettings.disableStagger = val == 0;
+                            ApplyDisableStagger();
+                        },
+                        loadSetting: () => localSettings.disableStagger ? 0 : 1,
+                        Id: "disableStagger"
                     ),
                     new MenuButton(
                         name: "Reset To Defaults",
@@ -91,13 +99,14 @@ namespace CollectorModifier {
             if (self.gameObject.name == "Jar Collector") {
                 if (self.FsmName == "Control") {
                     controlFSM = self;
-                    ApplySettings();
                 } else if (self.FsmName == "Phase Control") {
                     phaseControlFSM = self;
-                    ApplySettings();
                 } else if (self.FsmName == "Damage Control") {
                     damageControlFSM = self;
+                } else if (self.FsmName == "Stun Control") {
+                    stunControlFSM = self;
                 }
+                ApplySettings();
             }
         }
 
@@ -106,6 +115,7 @@ namespace CollectorModifier {
                 controlFSM = null;
                 phaseControlFSM = null;
                 damageControlFSM = null;
+                stunControlFSM = null;
             }
         }
 
@@ -113,6 +123,7 @@ namespace CollectorModifier {
             ApplySpawnCutoff();
             ApplyMinNumMinionsPerWave();
             ApplyMaxNumMinionsPerWave();
+            ApplyDisableStagger();
         }
 
         public void ApplySpawnCutoff() {
@@ -148,6 +159,18 @@ namespace CollectorModifier {
             }
         }
 
+        public void ApplyDisableStagger() {
+            Modding.Logger.Log("ApplyDisableStagger");
+            Modding.Logger.Log(localSettings.disableStagger);
+            if (stunControlFSM != null) {
+                if (localSettings.disableStagger) {
+                    stunControlFSM.GetState("Max Check").RemoveTransition("STUN");
+                } else {
+                    stunControlFSM.GetState("Idle").AddTransition("STUN", "Stun");
+                }
+            }
+        }
+
         public void ResetToDefaults() {
             localSettings.spawnCutoff = 4;
             localSettings.maxNumMinionsPerWave = 3;
@@ -157,9 +180,11 @@ namespace CollectorModifier {
             CustomSlider spawnCutoffSlider = menuRef.Find("spawnCutoff") as CustomSlider;
             CustomSlider minNumMinionsPerWaveSlider = menuRef.Find("minNumMinionsPerWave") as CustomSlider;
             CustomSlider maxNumMinionsPerWaveSlider = menuRef.Find("maxNumMinionsPerWave") as CustomSlider;
+            HorizontalOption disableStagger = menuRef.Find("disableStagger") as HorizontalOption;
             spawnCutoffSlider.Update();
             minNumMinionsPerWaveSlider.Update();
             maxNumMinionsPerWaveSlider.Update();
+            disableStagger.Update();
         }
     }
 
@@ -167,5 +192,6 @@ namespace CollectorModifier {
         public int spawnCutoff = 4;
         public int minNumMinionsPerWave = 2;
         public int maxNumMinionsPerWave = 3;
+        public bool disableStagger = false;
     }
 }
