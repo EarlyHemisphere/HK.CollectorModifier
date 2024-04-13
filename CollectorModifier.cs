@@ -1,6 +1,7 @@
 ﻿using Modding;
 using Satchel.BetterMenus;
 using SFCore.Utils;
+using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 
 namespace CollectorModifier {
@@ -160,13 +161,19 @@ namespace CollectorModifier {
         }
 
         public void ApplyDisableStagger() {
-            Modding.Logger.Log("ApplyDisableStagger");
-            Modding.Logger.Log(localSettings.disableStagger);
             if (stunControlFSM != null) {
-                if (localSettings.disableStagger) {
-                    stunControlFSM.GetState("Max Check").RemoveTransition("STUN");
-                } else {
-                    stunControlFSM.GetState("Idle").AddTransition("STUN", "Stun");
+                int numActions = stunControlFSM.GetState("Stun").Actions.Length;
+                if (localSettings.disableStagger && numActions == 5) {
+                    stunControlFSM.RemoveAction("Stun", 2);
+                } else if (!localSettings.disableStagger && numActions == 4) {
+                    FsmEventTarget target = new FsmEventTarget();
+                    target.target = FsmEventTarget.EventTarget.Self;
+                    stunControlFSM.GetState("Stun").InsertAction(new SendEventByName {
+                        eventTarget = target,
+                        sendEvent = "STUN",
+                        delay = 0f,
+                        everyFrame = false
+                    }, 1);
                 }
             }
         }
